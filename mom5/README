@@ -1,0 +1,11 @@
+To build::
+
+   ./mom5build.sh
+
+To setup the experiment::
+
+   ./mom5setup.sh
+
+To submit/run the job::
+
+   qsub mom5run.sh
