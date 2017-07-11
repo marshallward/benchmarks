@@ -4,8 +4,8 @@
 
 # Script configuration
 
-MOM_ROOT=$(pwd)/mom5    # Replace with target directory
-TARGET=vendor           # Assign a unique name for this build (e.g. company)
+MOM_ROOT=$(pwd)/codebase    # Replace with target directory
+TARGET=vendor               # Assign a unique name for this build (e.g. company)
 
 
 #------------------------------------------------------------------------------
