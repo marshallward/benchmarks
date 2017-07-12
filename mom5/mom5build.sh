@@ -94,6 +94,7 @@ cp mkmf.template.nci mkmf.template.${TARGET}
 cd ${MOM_ROOT}/exp
 ./MOM_compile.csh --platform ${TARGET} --type MOM_solo
 ./MOM_compile.csh --platform ${TARGET} --type MOM_SIS
+./MOM_compile.csh --platform ${TARGET} --type CM2M
 
 # Executables are created in the `exec` directory:
 #
