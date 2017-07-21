@@ -1,0 +1,31 @@
+=======================
+Benchmark specification
+=======================
+
+Notes attempting to detangle the benchmarking process.
+
+Application configuration parameters:
+   - Algorithm/calculation (major subroutines)
+   - Total FLOP count
+      - FLOP count for major subroutines
+   - Total memory
+      - Memory per rank (as a function of rank count)
+   - MPI message count, distribution of message sizes 
+
+Application benchmark metrics:
+   - Runtime
+   - FLOP/sec
+   - Memory bandwidth (GB/sec)
+      - Interconnect
+      - RAM <-> CPU
+      - Cache (if applicable)
+
+Metric contexts:
+   - Total time
+   - Initialisation, Main loop, Finalise
+   - Major subroutines (i.e. top 5 functions as relative runtime)
+   - Scalability over multiple CPU counts
+
+Process:
+- Identify current metric needs
+- Evaluate capacity of available hardware

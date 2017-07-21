@@ -4,19 +4,22 @@ ROOT=$(pwd)
 CODEBASE=${ROOT}/codebase
 OM25_WORK=${ROOT}/om25
 OM25_EXPT=global_0.25_degree_NYF
+CM2_EXPT=CM2.1p1
+
+DATASETS="${OM25_EXPT} ${CM2_EXPT}"
 
 #------------------------------------------------------------------------------
 # 1. Fetch the experiment datasets
 
 cd ${CODEBASE}/data
 
-for DATASET in ${OM25_EXPT}; do
-    DATAFILE=${DATASET}.input.tar.gz
+for dataset in ${DATASETS}; do
+    DATAFILE=${dataset}.input.tar.gz
     DATAPATH=${CODEBASE}/data/archives/${DATAFILE}
 
     if [ ! -f ${DATAPATH} ]; then
-        ./get_exp_data.py ${OM25_EXPT}.input.tar.gz
-        tar -xzvf ${CODEBASE}/data/archives/${OM25_EXPT}.input.tar.gz
+        ./get_exp_data.py ${DATAFILE}
+        tar -xzvf ${DATAPATH}
     fi
 done
 
