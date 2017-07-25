@@ -10,7 +10,7 @@ Application configuration parameters:
       - FLOP count for major subroutines
    - Total memory
       - Memory per rank (as a function of rank count)
-   - MPI message count, distribution of message sizes 
+   - MPI message count, distribution of message sizes
 
 Application benchmark metrics:
    - Runtime
@@ -29,3 +29,38 @@ Metric contexts:
 Process:
 - Identify current metric needs
 - Evaluate capacity of available hardware
+
+
+Ocean modelling
+---------------
+
+Ocean model simulations comprise some of the largest simulations on Raijin,
+potentially using over 10,000 CPUs per simulation.  Past and current
+simulations are summarised below.
+
+==========  =================    =========   =========
+Resolution  Grid size            Scaling     Operation
+==========  =================    =========   =========
+1°            360 x  300 x 50         *          96
+0.25°        1440 x 1080 x 75        4480      1920
+0.1°         3600 x 2700 x 75       20000      5136
+0.03°       12000 x 9000 x ??      100000       ??
+==========  =================    ==========  =========
+
+MOM 5 has proven to be a highly scaleable model with few bottlenecks in
+production simulations.
+
+TODO:
+- Total FLOPs, est. FLOP/sec (should be ~1GF/sec)
+   - Little vectorization speedup
+   - RAM-bound?
+
+- Communication
+   - # of messages
+   - Bandwidth (bytes/sec)
+      (Likely not comm bound?)
+
+- Other??
+
+
+TODO: MOM6
