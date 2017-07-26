@@ -67,9 +67,30 @@ Total byte send/recv per timestep:
 
 Naive bandwidth: ~28 kiB/s but this is not accurate
 
+Go down to biharmonic solver, interior rank:
 
+Total bytes: 573696000 (10 days = 480 steps)
+Bytes/step:
+   - 1195200 bytes
+   = 18 * 50 * (4*1 + 2*36 + 2*45) * 8 bytes
+   = (18 halo updates) * (50 levels) * (4 corners + 2 EW + 2NS edges) * 8 bytes
 
+BUT: Some halo updates are gathered in buffers.  In this case, only 6 are sent:
 
+Total 3D biharmonic messages: 11520 total sends (10 days = 480 steps)
+Messages/step:
+   - 24 messages 
+   - 6 updates * 4 sends per update (NESW, no corner sends)
+
+(With Score-P overhead...)
+Time: 1.2 - 5s (70%: 1.8 - 3.2, 2.5 mean)
+Time per step: 5ms
+
+Mean message size: 49800 bytes
+   - Actual is probably spread out: work it out?
+Mean bandwidth: ~0.2 GiB/s
+Peak cross-node: ~5 GiB/s
+   - TODO: Latency??
 
 TODO:
 - Total FLOPs, est. FLOP/sec (should be ~1GF/sec)
