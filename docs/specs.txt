@@ -50,6 +50,27 @@ Resolution  Grid size            Scaling     Operation
 MOM 5 has proven to be a highly scaleable model with few bottlenecks in
 production simulations.
 
+0.25° metrics
++++++++++++++
+
+Total timestep time: ~166s
+Total FLOPs: ??
+Total messages:
+
+Total byte send/recv per timestep:
+   Interior:   4827120 / 4827120
+   South:      3430328 / 3448728
+   Northwest:  4964024 / 4827120
+   NW (end):   4961736 / 4827120
+   Northeast:  4835376 / 4935480
+   NE (end):   4836520 / 4934336
+
+Naive bandwidth: ~28 kiB/s but this is not accurate
+
+
+
+
+
 TODO:
 - Total FLOPs, est. FLOP/sec (should be ~1GF/sec)
    - Little vectorization speedup
