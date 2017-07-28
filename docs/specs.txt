@@ -67,20 +67,53 @@ Total byte send/recv per timestep:
 
 Naive bandwidth: ~28 kiB/s but this is not accurate
 
-Go down to biharmonic solver, interior rank:
+----
 
-Total bytes: 573696000 (10 days = 480 steps)
-Bytes/step:
+Go down to biharmonic solver, interior rank.
+
+Subroutine: ``ocean_bihgen_friction_mod.bihgen_friction_``
+Bytes per step:
    - 1195200 bytes
    = 18 * 50 * (4*1 + 2*36 + 2*45) * 8 bytes
    = (18 halo updates) * (50 levels) * (4 corners + 2 EW + 2NS edges) * 8 bytes
 
-BUT: Some halo updates are gathered in buffers.  In this case, only 6 are sent:
+BUT: Some halo updates are gathered in buffers.  In this case, only three are
+sent:
 
-Total 3D biharmonic messages: 11520 total sends (10 days = 480 steps)
-Messages/step:
-   - 24 messages 
-   - 6 updates * 4 sends per update (NESW, no corner sends)
+   1. 8x ``stress`` (L1132-1139)
+   2. 2x ``tmplap`` (L1182-1183)
+   3. 8x ``stress`` (L1132-1139)
+
+(Plus two infrequent updates, unused?)
+
+Each bundle does 8 updates: 2 NS, 2EW, 4 corners.  Sizes:
+
+8 fields * 45 pts * 50 depth * 1 halo * 8 bytes
+
+   NS: 144000 bytes
+   EW: 115200 bytes
+   Cr: 3200 bytes
+
+The theoretical bandwidth and times from OSU::
+
+    # OSU MPI Bandwidth Test v5.3
+    # Size      Bandwidth (MB/s)
+    3200                 2883.69
+    115200               2585.94
+    144000               1613.16
+    800                   957.84
+    28800                1312.54
+    36000                5446.17
+
+    # OSU MPI Bandwidth Test v5.3
+    # Size      Bandwidth (MB/s)
+    3200                 2786.77
+    115200               3100.62
+    144000               1114.06
+    800                   970.61
+    28800                3249.32
+    36000                2413.08
+
 
 (With Score-P overhead...)
 Time: 1.2 - 5s (70%: 1.8 - 3.2, 2.5 mean)
