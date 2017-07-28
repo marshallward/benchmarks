@@ -84,41 +84,54 @@ sent:
    2. 2x ``tmplap`` (L1182-1183)
    3. 8x ``stress`` (L1132-1139)
 
-(Plus two infrequent updates, unused?)
+Barriers (as ``mpp_sync_self``) occur after each list element.
+
+(There are also other halo updates, but they are conditionally called and do
+not appear in the profile.)
 
 Each bundle does 8 updates: 2 NS, 2EW, 4 corners.  Sizes:
 
-8 fields * 45 pts * 50 depth * 1 halo * 8 bytes
+The stress message sizes are:
 
-   NS: 144000 bytes
-   EW: 115200 bytes
-   Cr: 3200 bytes
+   North-South:   144000 bytes
+   East-West:     115200 bytes
+   Corner:        3200 bytes
 
-The theoretical bandwidth and times from OSU::
+The Laplacian message sizes are:
 
-    # OSU MPI Bandwidth Test v5.3
-    # Size      Bandwidth (MB/s)
-    3200                 2883.69
-    115200               2585.94
-    144000               1613.16
-    800                   957.84
-    28800                1312.54
-    36000                5446.17
+   North-South:   36000 bytes
+   East-West:     28800 bytes
+   Corner:        800 bytes
 
-    # OSU MPI Bandwidth Test v5.3
-    # Size      Bandwidth (MB/s)
-    3200                 2786.77
-    115200               3100.62
-    144000               1114.06
-    800                   970.61
-    28800                3249.32
-    36000                2413.08
+The median empirical bandwidths from nine OSU tests are shown below.
+Taking the fastest times and (t = bytes / bandwidth):
 
+========    =========   ===========
+Msg (B)     BW (MB/s)   Time (usec) 
+========    =========   ===========
+  3200      2965.15      1.1
+115200      2882.26     40.0
+144000      1517.31     94.9
+  800        959.72      0.8
+ 28800      5300.15      5.4
+ 36000      5124.02      7.0
+========    =========   ===========
 
-(With Score-P overhead...)
-Time: 1.2 - 5s (70%: 1.8 - 3.2, 2.5 mean)
-Time per step: 5ms
+The slowest operation is north-south transfer of the stress tensor.  So we
+estimate the runtime as twice this operation:
 
+   t ~= 2*95 + 7 sec
+      = 197 usec
+
+For 480 steps, this is about 0.1 seconds.  But we see much larger:
+
+   (With Score-P overhead...)
+   Time: 1.2 - 5s (70%: 1.8 - 3.2, 2.5 mean)
+   Time per step: 5ms
+
+So not sure what's going on...
+
+(What is this???)
 Mean message size: 49800 bytes
    - Actual is probably spread out: work it out?
 Mean bandwidth: ~0.2 GiB/s
