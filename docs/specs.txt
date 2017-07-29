@@ -35,22 +35,106 @@ Ocean modelling
 ---------------
 
 Ocean model simulations comprise some of the largest simulations on Raijin,
-potentially using over 10,000 CPUs per simulation.  Past and current
-simulations are summarised below.
+potentially using over 10,000 CPUs per simulation.  Current and future
+configurations are summarised below.
 
-==========  =================    =========   =========
-Resolution  Grid size            Scaling     Operation
-==========  =================    =========   =========
-1°            360 x  300 x 50         *          96
-0.25°        1440 x 1080 x 75        4480      1920
-0.1°         3600 x 2700 x 75       20000      5136
-0.03°       12000 x 9000 x ??      100000       ??
-==========  =================    ==========  =========
+==========  ==================   =========   =========
+Resolution  Grid size            Peak        Operation
+==========  ==================   =========   =========
+1°            360 x  300 x  50         *            96
+0.25°        1440 x 1080 x  75        4480        1920
+0.1°         3600 x 2700 x  75       20000        5136
+0.03°       12000 x 9000 x 140      100000         *
+==========  ==================   =========   =========
 
-MOM 5 has proven to be a highly scaleable model with few bottlenecks in
+MOM 5 has proven to be a highly scaleable model with few major bottlenecks in
 production simulations.
 
-0.25° metrics
+In the analysis below, we include the total main loop time and the time in the
+ocean submodel, along with four ocean subregions which comprise the largest
+shares of runtime:
+
+* *MDPPM*, the finite volume tracer advection scheme
+* *Bih friction*, the biharmonic friction solver
+* *Barotropic*, the two-dimensional free surface solver
+* *KPP*, the vertical mixing scheme.
+
+This includes representative subroutines of 2D, 3D, and vertical physics
+operations within the model.
+
+
+Calculation
++++++++++++
+
+The total FLOPs over a 1-day simulation with PAPI profiling enabled are shown
+below.  Runtimes are inferred from a 10-day simulation without profiling and
+used to compute an effect performance rate in GFLOPs per second.
+
+============   ======   =======  ============
+Region         TFLOPs   Runtime  GFLOP/core/s
+============   ======   =======  ============
+Main Loop        18.9      19.7          1.00
+Ocean            18.0      16.5          1.13
+MDPPM             7.5       2.5          3.13
+Bih friction      1.4       1.6          0.91
+Barotropic        1.7       1.0          1.77
+KPP               1.2       1.4          0.89
+============   ======   =======  ============
+
+MOM 5 performance is far below theoretical peak of approximately 12 GFLOP/sec,
+with the majority of the model running at about 1 GFLOP/sec.  The notable
+exception is the finite volume MDPPM advection, whose performance is three
+times higher than the rest of the model.
+
+From these results, we infer that MOM 5 is not compute-bound but is instead
+bound by either memory or communication.  MDPPM may be bound at a higher cache
+level, such as L3, 
+
+
+Vectorisation
++++++++++++++
+
+Runtimes for the major subroutines of the model are shown below across
+different architectures and vectorisation instructions enabled.  We use a
+10-day simulation of the 0.25° global MOM-SIS configuration.  The median
+runtime is reported over an ensemble of runs.  Ensemble size varies across
+configurations, from 6 to 10 runs.
+
+In the table below, "SB" denotes Sandy Bridge, "BW" is Broadwell, and "KL" is
+Knights Landing.
+
+============   ===========    ========    ========    =========   =========
+Region         Serial (SB)    AVX (SB)    AVX (BW)    AVX2 (BW)   AVX2 (KL)
+============   ===========    ========    ========    =========   =========
+Main Loop            226.8       197.2       179.9        172.7       491.6
+Ocean                179.3       165.0       160.6        156.7       382.6
+MDPPM                 31.4        25.1        22.7         21.0        61.1
+Bih friction          16.7        15.9        16.0         15.8        33.1
+Barotropic            11.2         9.6         7.3          6.7        40.6
+KPP                   14.7        14.0        13.6         13.6        29.2
+============   ===========    ========    ========    =========   =========
+
+The table indicates that MOM as a whole is moderately sensitive to
+vectorization.  AVX vectorisation introduces a 1.15x speedup of the MOM-SIS
+run and 1.09x speedup of the ocean core.  The MDPPM tracer advection appears to
+benefits the most from vectorisation, showing a 1.25x speedup.  The barotropic
+solver shows a similar improvement of 1.17x AVX speedup.  The other regions
+show minor speedups.
+
+Execution on the Broadwell architecture yields addition speedups of 1.10x of
+the main loop, but only 1.03x speedup of the ocean core.  MDPPM tracer
+advection and the barotropic solver are again significant, with speedups of
+1.10x and 1.32x, respectively, though again the biharmonic friction and KPP
+vertical mixing speedups are modest.  Activation of AVX2 shows additional
+improvements, but the speedups are more modest, on the order of 1.02x.
+
+MOM5 currently does not run using AVX-512 vectorisation and produces
+segmentation faults which have not yet been investigates.  But the results in
+this section show that we should only expect at best a modest improvement in
+runtime.
+
+
+Communication
 +++++++++++++
 
 Total timestep time: ~166s
@@ -69,7 +153,7 @@ Naive bandwidth: ~28 kiB/s but this is not accurate
 
 ----
 
-Go down to biharmonic solver, interior rank.
+Go down to biharmonic viscosity, interior rank.
 
 Subroutine: ``ocean_bihgen_friction_mod.bihgen_friction_``
 Bytes per step:
@@ -109,12 +193,12 @@ Taking the fastest times and (t = bytes / bandwidth):
 ========    =========   ===========
 Msg (B)     BW (MB/s)   Time (usec) 
 ========    =========   ===========
-  3200      2965.15      1.1
-115200      2882.26     40.0
-144000      1517.31     94.9
-  800        959.72      0.8
- 28800      5300.15      5.4
- 36000      5124.02      7.0
+    3200      2965.15           1.1
+  115200      2882.26          40.0
+  144000      1517.31          94.9
+     800       959.72           0.8
+   28800      5300.15           5.4
+   36000      5124.02           7.0
 ========    =========   ===========
 
 The slowest operation is north-south transfer of the stress tensor.  So we
