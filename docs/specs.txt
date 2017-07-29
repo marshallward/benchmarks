@@ -66,9 +66,9 @@ operations within the model.
 Calculation
 +++++++++++
 
-The total FLOPs over a 1-day simulation with PAPI profiling enabled are shown
-below.  Runtimes are inferred from a 10-day simulation without profiling and
-used to compute an effect performance rate in GFLOPs per second.
+The total FLOPs over a 1-day simulation as reported by PAPI are shown below.
+Runtimes are rescaled from a 10-day simulation without profiling and used to
+compute an effective performance rate in GFLOPs per second.
 
 ============   ======   =======  ============
 Region         TFLOPs   Runtime  GFLOP/core/s
@@ -81,18 +81,35 @@ Barotropic        1.7       1.0          1.77
 KPP               1.2       1.4          0.89
 ============   ======   =======  ============
 
-MOM 5 performance is far below theoretical peak of approximately 12 GFLOP/sec,
-with the majority of the model running at about 1 GFLOP/sec.  The notable
-exception is the finite volume MDPPM advection, whose performance is three
-times higher than the rest of the model.
+MOM 5 performance is about ten times lower than the theoretical peak of
+approximately 12 GFLOP/sec, with the majority of the model running at about 1
+GFLOP/sec.  The notable exception is the finite volume MDPPM advection, whose
+performance is three times higher than the rest of the model.
 
-From these results, we infer that MOM 5 is not compute-bound but is instead
-bound by either memory or communication.  MDPPM may be bound at a higher cache
-level, such as L3, 
+It suggests that the majority of the model is RAM-bound, although the MDPPM
+calculation may be bound at an internal cache level.
 
 
 Vectorisation
 +++++++++++++
+
+The MOM 5 source produces vectorised code to a high degree.  This is confirmed
+by the ratio of vectorized FLOPs to total FLOPs, as reported by PAPI
+(``PAPI_DP_OPS`` and ``PAPI_VEC_DP``) and shown in the table below.
+
+============   ======   ====== 
+Region         TFLOPs   % SIMD
+============   ======   ====== 
+Main Loop        18.9     90.5
+Ocean            18.0     90.5
+MDPPM             7.5     94.1
+Bih friction      1.4     90.7
+Barotropic        1.7     95.9
+KPP               1.2     78.3
+============   ======   ====== 
+
+The numbers confirm that SIMD vectorisation instructions are being used,
+although there is no guarantee of their effective use.
 
 Runtimes for the major subroutines of the model are shown below across
 different architectures and vectorisation instructions enabled.  We use a
@@ -114,12 +131,12 @@ Barotropic            11.2         9.6         7.3          6.7        40.6
 KPP                   14.7        14.0        13.6         13.6        29.2
 ============   ===========    ========    ========    =========   =========
 
-The table indicates that MOM as a whole is moderately sensitive to
-vectorization.  AVX vectorisation introduces a 1.15x speedup of the MOM-SIS
-run and 1.09x speedup of the ocean core.  The MDPPM tracer advection appears to
-benefits the most from vectorisation, showing a 1.25x speedup.  The barotropic
-solver shows a similar improvement of 1.17x AVX speedup.  The other regions
-show minor speedups.
+The table indicates that vectorization is moderately beneficial to MOM.  AVX
+vectorisation introduces a 1.15x speedup of the MOM-SIS run and 1.09x speedup
+of the ocean core.  The MDPPM tracer advection appears to benefits the most
+from vectorisation, showing a 1.25x speedup.  The barotropic solver shows a
+similar improvement of 1.17x AVX speedup.  The other regions show minor
+speedups.
 
 Execution on the Broadwell architecture yields addition speedups of 1.10x of
 the main loop, but only 1.03x speedup of the ocean core.  MDPPM tracer
