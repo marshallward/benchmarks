@@ -99,7 +99,7 @@ by the ratio of vectorized FLOPs to total FLOPs, as reported by PAPI
 
 ============   ======   ====== 
 Region         TFLOPs   % SIMD
-============   ======   ====== 
+============   ======   ======
 Main Loop        18.9     90.5
 Ocean            18.0     90.5
 MDPPM             7.5     94.1
@@ -250,6 +250,39 @@ TODO:
       (Likely not comm bound?)
 
 - Other??
+
+-------
+
+Barotropic analysis: ``pred_corr_tropic_depth_bgrid``
+
+Message split into vector and scalar updates.
+
+Barotropic halo is 10, so the bytes per halo update are:
+   (4 * 10 * 10) + (2 * 45 * 10) + (2 * 36 * 10)
+   = 2020 bytes
+
+Vector bytes / step: 581760
+   = 72720 doubles
+   = 36360 (x,y) pairs
+   = 18 calls (17 bundled)
+
+Scalar bytes / step: 323200
+   = 40400 doubles
+   = 20 calls (18 bundled)
+
+There are 160 calls per main (baroclinic) timestep.
+(Split is 80, why is it 2x?)
+
+Updates:
+
+1. Vector: ``udrho_bt``, ``forcing_bt`` bundled
+2. Scalar: ``patm_bt``, ``steady_forcing``, ``eta_bt`` bundled
+3.  Scalar: ``thicku_bt``
+
+4. 16x times:
+   a. ``udrho_bt`` (L3490)
+   b. ``eta_t_bt`` (L3529)
+
 
 
 TODO: MOM6
