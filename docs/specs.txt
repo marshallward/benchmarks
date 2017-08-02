@@ -232,24 +232,13 @@ For 480 steps, this is about 0.1 seconds.  But we see much larger:
 
 So not sure what's going on...
 
+
 (What is this???)
 Mean message size: 49800 bytes
    - Actual is probably spread out: work it out?
 Mean bandwidth: ~0.2 GiB/s
 Peak cross-node: ~5 GiB/s
    - TODO: Latency??
-
-TODO:
-- Total FLOPs, est. FLOP/sec (should be ~1GF/sec)
-   - Little vectorization speedup
-   - RAM-bound?
-
-- Communication
-   - # of messages
-   - Bandwidth (bytes/sec)
-      (Likely not comm bound?)
-
-- Other??
 
 -------
 
@@ -277,11 +266,46 @@ Updates:
 
 1. Vector: ``udrho_bt``, ``forcing_bt`` bundled
 2. Scalar: ``patm_bt``, ``steady_forcing``, ``eta_bt`` bundled
-3.  Scalar: ``thicku_bt``
+3. Scalar: ``thicku_bt``
 
 4. 16x times:
    a. ``udrho_bt`` (L3490)
    b. ``eta_t_bt`` (L3529)
+
+Message sizes and empirical bandwidths are shown below.
+
+=========   ========    =========   ===========
+Msg Type    Size (B)    BW (MB/s)   Time (usec) 
+=========   ========    =========   ===========
+Corner           800      930.09          0.86
+E/W             2880     2736.33          1.05
+N/S             3600     3183.24          1.13
+v Corner        1600     1777.79          0.90
+v E/W           5760     3972.84          1.45
+v N/S           7200     1841.51*         3.91*
+=========   ========    =========   ===========
+
+(Star denotes volatile times)
+
+
+=========   ========    =========   ===========
+Msg Type    Size (B)    BW (MB/s)   Time (usec) 
+=========   ========    =========   ===========
+b Corner        2400
+b E/W           8640
+b N/S          10800
+bv Corner       3200
+bv E/W         11520
+bv N/S         14400
+=========   ========    =========   ===========
+
+Estimated runtime per timestep:
+
+   T = 16 * 4 us + 16 * 1.1 + (?) + (?)
+     ~= 80 usec (<0.1 msec)
+
+   Observed is 5 msec
+
 
 
 
