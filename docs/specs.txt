@@ -146,7 +146,7 @@ vertical mixing speedups are modest.  Activation of AVX2 shows additional
 improvements, but the speedups are more modest, on the order of 1.02x.
 
 MOM5 currently does not run using AVX-512 vectorisation and produces
-segmentation faults which have not yet been investigates.  But the results in
+segmentation faults which have not yet been investigated.  But the results in
 this section show that we should only expect at best a modest improvement in
 runtime.
 
@@ -154,75 +154,120 @@ runtime.
 Communication
 +++++++++++++
 
-Total timestep time: ~166s
-Total FLOPs: ??
-Total messages:
+Message passing in MOM 5 is dominated by halo updates, implemented using
+unbuffered ``MPI_Isend`` calls, with halo data manually packed into arrays.
+Most ranks send eight messages to nearest neighbors:  Two north/south packets,
+two east/west packets, and four corner packets, with some modification along
+boundaries and tripole ranks.
 
-Total byte send/recv per timestep:
-   Interior:   4827120 / 4827120
-   South:      3430328 / 3448728
-   Northwest:  4964024 / 4827120
-   NW (end):   4961736 / 4827120
-   Northeast:  4835376 / 4935480
-   NE (end):   4836520 / 4934336
+Collectives are only used during model initialisation and for other very
+infrequent tasks, such as diagnostic and checksum calculations.  Nearly 99% of
+communication time is devoted to halo exchange, and no collectives appear in
+the timesteps of our configuration.
 
-Naive bandwidth: ~28 kiB/s but this is not accurate
+are only are applied at infrequent intervals, primarily related to
+diagnostic and checksum calculations.  (Confirm)
 
-----
+For the results below, we examine the 0.25° global model using a 960-core
+configuration (32 latitude ranks, 30 longitude ranks).
 
-Go down to biharmonic viscosity, interior rank.
+Total byte send/recv per timestep are shown below.
 
-Subroutine: ``ocean_bihgen_friction_mod.bihgen_friction_``
-Bytes per step:
-   - 1195200 bytes
+================  ======== ========
+Rank type         Sent (B) Recv (B)
+================  ======== ========
+Interior tile      4827120  4827120
+South boundary     3430328  3448728
+NW tripole         4964024  4827120
+NW tripole (end)   4961736  4827120
+NE tripole         4835376  4935480
+NE tripole (end)   4836520  4934336
+================  ======== ========
+
+The majority of ranks (93% in this case) consist of interior tiles.
+
+The runtime per step is 0.35 seconds, and the approximate MPI time ratio within
+the ocean timestep is 18%, so the broad bandwidth estimate ``B`` is
+
+   B = 4827120 / (0.18 * 0.35) ~= 0.08 GB/s
+
+This is less than 2% of peak performance (7 GB/s theoretical, 5-6 GB/s
+empirical), although the estimation here ignores most of the detail in the
+calculation.  We attempt to clarify this analysis by looking at the 2D and 3D
+halo updates in individual sections.
+
+
+Biharmonic viscosity
+~~~~~~~~~~~~~~~~~~~~
+
+The greatest portion of data transfer occurs within the biharmonic Smagorinsky
+calculation (25% of total halo exchange data), which requires halo updates of
+the many stress tensor components.
+
+The biharmonic viscosity is calculated in the ``bihgen_friction`` function of
+the ``ocean_bihgen_friction_mod`` module.  (See
+``src/mom5/ocean_param/lateral/ocean_bihgen.F90``).
+
+Each timestep requires an halo update of 18 3-dimensional fields, so that the
+total number of bytes transferred by each interior rank is
+
+   (18 halo updates) * (50 levels) * (4 corners + 2 EW + 2NS edges) * 8 bytes
    = 18 * 50 * (4*1 + 2*36 + 2*45) * 8 bytes
-   = (18 halo updates) * (50 levels) * (4 corners + 2 EW + 2NS edges) * 8 bytes
+   = 1195200 bytes
 
-BUT: Some halo updates are gathered in buffers.  In this case, only three are
-sent:
+However, the bandwidth is improved by gathering fields into larger message
+buffers, so that only three messages are sent per timestep.  The messages are
+sent in the order shown below.
 
-   1. 8x ``stress`` (L1132-1139)
-   2. 2x ``tmplap`` (L1182-1183)
-   3. 8x ``stress`` (L1132-1139)
+   - 8 ``stress`` fields (L1132-1139)
+   - 2 ``tmplap`` fields (L1182-1183)
+   - 8 ``stress`` fields (L1244-1251)
 
-Barriers (as ``mpp_sync_self``) occur after each list element.
+Each halo exchanges requires 8 updates per field.
 
-(There are also other halo updates, but they are conditionally called and do
-not appear in the profile.)
-
-Each bundle does 8 updates: 2 NS, 2EW, 4 corners.  Sizes:
-
-The stress message sizes are:
+   - 2 north-south transfers
+   - 2 east-west transfers
+   - 4 corner transfers
+     
+The message sizes of the bundled ``stress`` fields are
 
    North-South:   144000 bytes
    East-West:     115200 bytes
    Corner:        3200 bytes
 
-The Laplacian message sizes are:
+The bundled Laplacian message sizes are
 
    North-South:   36000 bytes
    East-West:     28800 bytes
    Corner:        800 bytes
 
-The median empirical bandwidths from nine OSU tests are shown below.
-Taking the fastest times and (t = bytes / bandwidth):
+We estimate the empirical bandwidths using the OSU point-to-point benchmark
+tool.  The median transfer rate over nine tests, along with the estimated
+transfer time, are shown below.
 
-========    =========   ===========
-Msg (B)     BW (MB/s)   Time (usec) 
-========    =========   ===========
-    3200      2965.15           1.1
-  115200      2882.26          40.0
-  144000      1517.31          94.9
-     800       959.72           0.8
-   28800      5300.15           5.4
-   36000      5124.02           7.0
-========    =========   ===========
+=============  =========   =========   ===========
+Msg Type       Size (B)    BW (MB/s)   Time (μsec) 
+=============  =========   =========   ===========
+stress N/S        144000    1517.31*          94.9
+stress E/W        115200    2882.26*          40.0
+stress Corner       3200    2965.15            1.1
+lap N/S            36000    5124.02            7.0
+lap E/W            28800    5300.15            5.4
+lap Corner           800     959.72            0.8
+=============  =========   =========   ===========
 
-The slowest operation is north-south transfer of the stress tensor.  So we
-estimate the runtime as twice this operation:
+Stars (*) indicate volatile bandwidth measurements, which can vary from under
+1.5 GB/s to over 5 GB/s.
 
-   t ~= 2*95 + 7 sec
-      = 197 usec
+(WRONG!  How are messaged handled?  Are they concurrent?  Then bandwidth will
+be lower.  Are they serial?  Then time would be more like 0.6 msec.  Then again
+
+If we assume that the halo exchange is bounded by the slowest operation, then
+all exchange is essentially throttled to 1.5 GB/s and the estimated halo
+exchange time is 
+
+   T_transfer ~= 2*95 μsec + 7 μsec
+               = 0.2 msec.
 
 For 480 steps, this is about 0.1 seconds.  But we see much larger:
 
@@ -274,16 +319,16 @@ Updates:
 
 Message sizes and empirical bandwidths are shown below.
 
-=========   ========    =========   ===========
-Msg Type    Size (B)    BW (MB/s)   Time (usec) 
-=========   ========    =========   ===========
-Corner           800      930.09          0.86
-E/W             2880     2736.33          1.05
-N/S             3600     3183.24          1.13
-v Corner        1600     1777.79          0.90
-v E/W           5760     3972.84          1.45
-v N/S           7200     1841.51*         3.91*
-=========   ========    =========   ===========
+=============  ========    =========   ===========
+Msg Type       Size (B)    BW (MB/s)   Time (usec) 
+=============  ========    =========   ===========
+scalar N/S         3600     3183.24          1.13
+scalar E/W         2880     2736.33          1.05
+scalar Corner       800      930.09          0.86
+vector N/S         7200     1841.51*         3.91*
+vector E/W         5760     3972.84          1.45
+vector Corner      1600     1777.79          0.90
+=============  ========    =========   ===========
 
 (Star denotes volatile times)
 
