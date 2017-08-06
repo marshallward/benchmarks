@@ -42,7 +42,7 @@ configurations are summarised below.
 Resolution  Grid size            Peak        Operation
 ==========  ==================   =========   =========
 1°            360 x  300 x  50         *            96
-0.25°        1440 x 1080 x  75        4480        1920
+0.25°        1440 x 1080 x  50        4480        1920
 0.1°         3600 x 2700 x  75       20000        5136
 0.03°       12000 x 9000 x 140      100000         *
 ==========  ==================   =========   =========
@@ -223,27 +223,16 @@ sent in the order shown below.
    - 2 ``tmplap`` fields (L1182-1183)
    - 8 ``stress`` fields (L1244-1251)
 
-Each halo exchanges requires 8 updates per field.
+Each halo exchanges requires 8 updates per field:
 
    - 2 north-south transfers
    - 2 east-west transfers
    - 4 corner transfers
      
-The message sizes of the bundled ``stress`` fields are
-
-   North-South:   144000 bytes
-   East-West:     115200 bytes
-   Corner:        3200 bytes
-
-The bundled Laplacian message sizes are
-
-   North-South:   36000 bytes
-   East-West:     28800 bytes
-   Corner:        800 bytes
-
-We estimate the empirical bandwidths using the OSU point-to-point benchmark
-tool.  The median transfer rate over nine tests, along with the estimated
-transfer time, are shown below.
+The total bundled message sizes, and estimated bandwidths and transfer times,
+are shown below.  We estimate the empirical bandwidths using the OSU
+point-to-point benchmark tool.  We report the median transfer rate over nine
+tests.
 
 =============  =========   =========   ===========
 Msg Type       Size (B)    BW (MB/s)   Time (μsec) 
@@ -259,33 +248,21 @@ lap Corner           800     959.72            0.8
 Stars (*) indicate volatile bandwidth measurements, which can vary from under
 1.5 GB/s to over 5 GB/s.
 
-(WRONG!  How are messaged handled?  Are they concurrent?  Then bandwidth will
-be lower.  Are they serial?  Then time would be more like 0.6 msec.  Then again
+To translate these single-message estimates into a hypothetical transfer time,
+we would need to know how the messages are handled within the MPI library.  But
+if we assume the worse-case scenario, where the messages are sent and received
+serially, then the total transfer time ``T`` would be
 
-If we assume that the halo exchange is bounded by the slowest operation, then
-all exchange is essentially throttled to 1.5 GB/s and the estimated halo
-exchange time is 
+   T <= 2 * (2*(95 + 40 + 1) + 7 + 5 + 1) μsec
+     <= 0.66 msec
 
-   T_transfer ~= 2*95 μsec + 7 μsec
-               = 0.2 msec.
-
-For 480 steps, this is about 0.1 seconds.  But we see much larger:
-
-   (With Score-P overhead...)
-   Time: 1.2 - 5s (70%: 1.8 - 3.2, 2.5 mean)
-   Time per step: 5ms
-
-So not sure what's going on...
+However, estimates from Score-P across ranks are between 2.5 and 10 msec per
+step, which is at least an order of magnitude greater, suggesting an issue with
+either the message layout, library configuration, or intrinsic load imbalance.
 
 
-(What is this???)
-Mean message size: 49800 bytes
-   - Actual is probably spread out: work it out?
-Mean bandwidth: ~0.2 GiB/s
-Peak cross-node: ~5 GiB/s
-   - TODO: Latency??
-
--------
+Barotropic (free surface) solver
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Barotropic analysis: ``pred_corr_tropic_depth_bgrid``
 
@@ -352,7 +329,35 @@ Estimated runtime per timestep:
    Observed is ~11 msec
       (5.6 msec vector, 5.6 msec scalar)
 
+----
 
+Communication Summary
+~~~~~~~~~~~~~~~~~~~~~
 
+We can draw three main conclusions from the network bandwidth analysis.
+
+First, message size is appropriate for the current networks and, in principle,
+is capable of taking advantage of the FDR network.  Even the disparate size
+between side and corner messages still have comparable bandwidths, so that
+corner transfer times are (again, in principle) negligible in comparison to the
+larger side messages.
+
+However, despite the encouraging empirical bandwidths from the OSU tests, the
+actual halo exchange times are slow by approximately a factor of 10.  There are
+multiple potential causes of this, such as intrinsic load imbalance, greater
+traffic due to the large number of messages in the network, or implementation
+or configuration details of the MPI library.  At the time, we cannot explain
+this discrepancy.
+
+Finally, it is clear that certain message bandwidth speeds can vary greatly,
+sometimes by as much as a factor of fine, and that this is predominanly seen
+in the larger messages.  This may be contributing to the larger transfer times
+discussed in this section.
+
+In summary, the intrinsic messages used in the global 0.25° configuration of
+MOM 5 are suitable for our current interconnect, and could potentially benefit
+from an upgrade in the future.  However, there are still hurdles at either the
+application level, system libraries, or firmware which must be investigated
+further.
 
 TODO: MOM6
