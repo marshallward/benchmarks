@@ -84,17 +84,3 @@ mkmf \
 
 make clean
 make NETCDF=4 MOM6 -j
-
-
-#----
-
-# ??. Fetch the input data
-# (Is this possible here?)
-cd ${CODEBASE}
-
-INPUT_FILE=OM4_025.tgz
-if [ ! -f ${INPUT_FILE} ]; then
-    wget ftp://ftp.gfdl.noaa.gov/pub/aja/datasets/${INPUT_FILE}
-fi
-
-# 4.
