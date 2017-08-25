@@ -2,24 +2,39 @@
 set -x
 
 # 0. Set up environment
-CODEBASE=$(pwd)/codebase
-TARGET=nci-intel
-REPO_URL=https://github.com/NOAA-GFDL/MOM6-examples.git
+ROOT=$(pwd)
+CODEBASE=${ROOT}/codebase
+BENCH_WORK=${ROOT}/benchmark
+OM4_WORK=${ROOT}/om4
 
-# NOTE: MOM 6 needs a newer gcc (such as 6.2.0), but NCI's netcdf.mod is built
-# for the older GNU compilers and appears to be incompatible.  Ask help?
 
-module purge
-#module load gcc/6.2.0
-module load intel-cc/17.0.1.132
-module load intel-fc/17.0.1.132
-module load openmpi/1.10.2
-module load netcdf/4.3.3.1
-
+#----
 # Fetch the input data
-cd ${CODEBASE}
+#cd ${CODEBASE}/om4
+#
+#INPUT_FILE=OM4_025.tgz
+#if [ ! -f ${INPUT_FILE} ]; then
+#    wget ftp://ftp.gfdl.noaa.gov/pub/aja/datasets/${INPUT_FILE}
+#fi
 
-INPUT_FILE=OM4_025.tgz
-if [ ! -f ${INPUT_FILE} ]; then
-    wget ftp://ftp.gfdl.noaa.gov/pub/aja/datasets/${INPUT_FILE}
-fi
+
+#---
+# Set up the directory
+mkdir -p ${BENCH_WORK}/{INPUT,RESTART}
+
+for fname in MOM_input MOM_override diag_table input.nml; do 
+    cp ${CODEBASE}/ocean_only/benchmark/${fname} ${BENCH_WORK}
+done
+
+# Configure the experiment for high resolution
+BENCH_INPUT=${BENCH_WORK}/MOM_input
+cp ${BENCH_INPUT} ${BENCH_INPUT}.orig
+sed -i -e 's/NIGLOBAL = 360/NIGLOBAL = 1440/g' ${BENCH_INPUT}
+sed -i -e 's/NJGLOBAL = 180/NJGLOBAL = 1080/g' ${BENCH_INPUT}
+sed -i -e 's/NK = 22/NK = 75/g' ${BENCH_INPUT}
+
+
+#--
+# Link executable
+TARGET=nci-intel
+ln -s ${CODEBASE}/build/${TARGET}/ocean_only/repro/MOM6 ${BENCH_WORK}
